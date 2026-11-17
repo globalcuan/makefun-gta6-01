@@ -13,6 +13,7 @@
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
@@ -21,6 +22,38 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 const GAME_TITLE = 'Costa Serena';
 const GAME_VERSION = '1.0.1';
+const measure = (dir: string) => {
+  let files = 0;
+  let bytes = 0;
+  const visit = (path: string) => {
+    for (const name of readdirSync(path)) {
+      const child = join(path, name);
+      const info = statSync(child);
+      if (info.isDirectory()) visit(child);
+      else if (info.isFile()) { files++; bytes += info.size; }
+    }
+  };
+  if (existsSync(dir)) visit(dir);
+  return { files, bytes };
+};
+const game = measure(join(here, 'game'));
+const screenshotsDir = join(here, 'screenshots');
+const screenshots = measure(screenshotsDir);
+console.log(`Preflight game/: ${game.files} files, ${game.bytes} bytes`);
+console.log(`Preflight screenshots/: ${screenshots.files} files, ${screenshots.bytes} bytes`);
+if (game.files > 993) throw new Error(`Packaging limit exceeded: game/ exceeds 993 files (${game.files})`);
+if (game.bytes > 48 * 1024 * 1024) throw new Error(`Packaging limit exceeded: game/ exceeds 48 MiB (${game.bytes} bytes)`);
+if (existsSync(screenshotsDir)) {
+  const checkScreenshots = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const child = join(dir, name);
+      const info = statSync(child);
+      if (info.isDirectory()) checkScreenshots(child);
+      else if (info.isFile() && info.size > 256 * 1024) throw new Error(`Packaging limit exceeded: screenshot ${child} exceeds 256 KiB (${info.size} bytes)`);
+    }
+  };
+  checkScreenshots(screenshotsDir);
+}
 console.log(`Packaging ${GAME_TITLE} v${GAME_VERSION}`);
 
 mkdirSync(out, { recursive: true });
