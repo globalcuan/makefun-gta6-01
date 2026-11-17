@@ -1,61 +1,20 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
-
-export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
-};
-
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
-};
-
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
-};
-
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
-};
-
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+(function () {
+  const config = {
+    city: { size: 1200, roadSpacing: 120, blockSize: 90 },
+    colors: { stucco: [0xc96f4a, 0xd9a05b, 0xd97b6c, 0x3f8f8a, 0xe8c98f], glass: 0x2e4a55, roof: 0xb45a38, asphalt: 0x3a3f44, dash: 0xf5d76e, ground: 0x8a7f70, sand: 0xd9b380, sea: 0x1f7a8c, sky: 0xe8956b },
+    player: { walk: 6, run: 11 }, car: { accel: 22, topSpeed: 42, steer: 1.9 }, camera: { distance: 7, minPitch: -0.1, maxPitch: 0.9 },
+    lighting: { hemisphere: 0.75, sun: 0xffb36b, sunIntensity: 0.95, ambient: 0.15 }, fog: { start: 800, end: 1800 }
+  };
+  function mulberry32(seed) {
+    return function () {
+      let value = seed += 0x6D2B79F5;
+      value = Math.imul(value ^ value >>> 15, value | 1);
+      value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+      return ((value ^ value >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  window.CS = window.CS || {};
+  window.CS.config = config;
+  window.CS.rng = mulberry32;
+  window.CS.random = Math.random;
+})();

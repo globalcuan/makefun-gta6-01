@@ -1,134 +1,54 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
-import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-import { stageShot } from './shots.js';
-
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
-
-const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
-const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
-
-const canvas = document.getElementById('game');
-const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
-
-function readBest() {
-  try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
-  } catch {
-    return 0;
+(function () {
+  const CS = window.CS; let renderer, scene, camera, clock, running = false, paused = true, lastSave = 0, shotMode = false;
+  function safeUpdate(name, fn, ...args) { try { if (typeof fn === 'function') fn(...args); } catch (error) { console.error(name, error); } }
+  function init() {
+    const canvas = document.getElementById('game-canvas');
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); renderer.setSize(innerWidth, innerHeight);
+    scene = CS.city.build(); camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, .1, 2000); CS.player.create(scene); CS.player.setCamera(camera); CS.state = { money: 250 };
+    safeUpdate('hud.init', CS.hud.init); safeUpdate('minimap.init', CS.minimap.init); safeUpdate('police.init', CS.police.init, scene); safeUpdate('audio.ambient', CS.audio.ambient);
+    CS.vehicles.spawnParkedCars(scene, 30);
+    CS.traffic.spawn(scene, 14); CS.pedestrians.spawn(scene, 24);
+    safeUpdate('shots.apply', CS.shots.apply);
+    const save = CS.shots.mode() ? null : CS.save.load(); if (save) { CS.state.money = save.money || 250; CS.combat.health = save.health || 100; CS.missions.startMission(save.missionIndex || 0); if (save.pos) CS.player.state.position.set(save.pos.x, 0, save.pos.z); }
+    CS.input.init(canvas); clock = new THREE.Clock(); shotMode = !!CS.shots.mode();
+    const continueButton = document.getElementById('continue'); continueButton.hidden = !CS.save.hasSave();
+    document.getElementById('start-story').addEventListener('click', () => { CS.missions.startMission(0); start(); });
+    continueButton.addEventListener('click', start); document.getElementById('free-roam').addEventListener('click', start);
+    window.addEventListener('resize', resize); window.addEventListener('keydown', event => { if (event.code === 'F3') document.getElementById('debug').hidden = !document.getElementById('debug').hidden; });
+    document.addEventListener('pointerlockchange', () => { if (running && !document.pointerLockElement && !shotMode) pause(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && running) pause(); });
+    if (shotMode) { document.getElementById('start-screen').hidden = true; running = true; paused = false; document.body.style.cursor = 'none'; }
+    else document.getElementById('start-screen').hidden = false;
+    requestAnimationFrame(loop);
   }
-}
-
-function saveBest(value) {
-  try {
-    window.localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
-  }
-}
-
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
-  }
-  requestAnimationFrame(paint);
-}
-
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
-
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
-  }
-
-  function startGame() {
-    world.reset();
-    accumulator = 0;
-    screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
-  }
-
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
+  function start() { document.getElementById('start-screen').hidden = true; paused = false; running = true; clock.start(); safeUpdate('audio.init', CS.audio.init); const result = document.getElementById('game-canvas').requestPointerLock?.(); if (result && result.catch) result.catch(() => {}); }
+  function pause() { paused = true; running = false; safeUpdate('save.save', CS.save.save); document.getElementById('continue').hidden = !CS.save.hasSave(); document.getElementById('start-screen').hidden = false; }
+  function resize() { if (!renderer || !camera) return; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); }
+  function loop(time) {
+    if (!paused && !shotMode) {
+      const dt = Math.min(clock.getDelta(), .05);
+      if (CS.input.pressed('m')) CS.audio.toggleMute(); if (CS.input.pressed('f')) CS.combat.punch();
+      safeUpdate('input', () => {});
+      const previousCar = CS.player.state.inCar; safeUpdate('player', CS.player.update, dt, CS.input);
+      if (!previousCar && CS.player.state.inCar) safeUpdate('car theft heat', CS.police.addHeat, 1);
+      safeUpdate('vehicles', () => { for (const car of CS.vehicles.cars) if (!car.userData.isPolice && !CS.traffic.cars.includes(car) && car !== CS.player.state.inCar) CS.vehicles.update(car, { throttle: 0 }, dt); });
+      safeUpdate('traffic', CS.traffic.update, dt); safeUpdate('pedestrians', CS.pedestrians.update, dt);
+      safeUpdate('police', CS.police.update, dt, CS.player.state.position, CS.player.state.inCar, CS.player.state.inCar?.userData.speed || 0);
+      safeUpdate('combat', CS.combat.update, dt); safeUpdate('missions', CS.missions.update, dt);
+      safeUpdate('hud', CS.hud.update); safeUpdate('minimap', CS.minimap.update); safeUpdate('audio.engine', CS.audio.engine, CS.player.state.inCar ? Math.abs(CS.player.state.inCar.userData.speed) / 42 : 0); safeUpdate('audio.siren', CS.audio.siren, CS.police.getStars() > 0);
+      const sea = scene.children.find(item => item.userData.animate); if (sea) safeUpdate('sea', sea.userData.animate, time / 1000);
+      if (time - lastSave > 15000) { safeUpdate('autosave', CS.save.save); lastSave = time; }
     }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
+    if (shotMode) { safeUpdate('hud', CS.hud.update); safeUpdate('minimap', CS.minimap.update); }
+    if (camera && CS.player.state) {
+      if (CS.city.shotCamera) { camera.position.set(0, 55, 560); camera.lookAt(0, -100, -80); }
+      if (shotMode && CS.shots.mode() === 'mission') { const marker = CS.missions.markerPos(); camera.position.set(-420, 8, marker.z); camera.lookAt(marker.x, 1, marker.z); }
+      if (shotMode && CS.shots.mode() === 'cover') { const p = CS.player.state.position; camera.position.set(p.x, 3, p.z + 7); camera.lookAt(p.x, 1.2, p.z - 16); }
+      if (shotMode && CS.shots.mode() === 'chase') { const car = CS.player.state.inCar; camera.position.set(car.position.x, 4.2, car.position.z + 8); camera.lookAt(car.position.x, 1, car.position.z - 12); }
     }
+    renderer.render(scene, camera); requestAnimationFrame(loop);
   }
-
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
-      }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
-  });
-
-  announce('Block Dodger. Press Space or click to start.');
-  requestAnimationFrame(frame);
-}
-
-if (shot) runShot(shot);
-else runGame();
+  CS.main = { init, start, pause };
+  window.CS.boot = init;
+  document.addEventListener('DOMContentLoaded', init, { once: true });
+})();

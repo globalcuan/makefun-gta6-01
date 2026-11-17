@@ -1,53 +1,21 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
-
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
-
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
-
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
-
-  window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
-  });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
-  });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
-
-  return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
-    },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
-    },
-  };
-}
+(function () {
+  const keys = Object.create(null), justPressed = Object.create(null);
+  let mouseX = 0, mouseY = 0;
+  function keyNames(event) { return [event.code.toLowerCase(), event.key === ' ' ? ' ' : event.key.toLowerCase()]; }
+  function init(canvas) {
+    window.addEventListener('keydown', event => {
+      for (const key of keyNames(event)) { if (!keys[key]) justPressed[key] = true; keys[key] = true; }
+    });
+    window.addEventListener('keyup', event => { for (const key of keyNames(event)) keys[key] = false; });
+    document.addEventListener('mousemove', event => { if (document.pointerLockElement === canvas) { mouseX += event.movementX || 0; mouseY += event.movementY || 0; } });
+  }
+  function pressed(key) { const name = key.toLowerCase(); const value = !!justPressed[name]; justPressed[name] = false; return value; }
+  function axis() {
+    const x = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
+    const z = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
+    return { x, z };
+  }
+  function consumeMouse() { const result = { x: mouseX, y: mouseY }; mouseX = 0; mouseY = 0; return result; }
+  window.CS = window.CS || {};
+  window.CS.input = { init, pressed, axis, consumeMouse, keys };
+})();
