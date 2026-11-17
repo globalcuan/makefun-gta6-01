@@ -1,25 +1,28 @@
 (function () {
-  const CS = window.CS;
-  let root, bannerNode, centerNode, flashNode, objectiveNode, timerNode, moneyNode, healthNode, starsNode;
-  let bannerUntil = 0, centerUntil = 0, flashUntil = 0;
+  let root, bannerNode, centerNode, flashNode, bannerUntil = 0, centerUntil = 0;
   function init() {
     root = document.getElementById('hud');
-    root.innerHTML = '<div class="hud-left"><div id="hud-objective"></div><div id="hud-timer"></div></div><div class="hud-right"><div id="hud-money"></div><div id="hud-health"><i></i></div><div id="hud-stars"></div></div><div id="hud-banner"></div><div id="hud-center"></div><div id="hud-flash"></div><div id="hud-hint">E — enter car&nbsp;&nbsp; F — punch&nbsp;&nbsp; M — mute</div>';
-    objectiveNode = root.querySelector('#hud-objective'); timerNode = root.querySelector('#hud-timer'); moneyNode = root.querySelector('#hud-money'); healthNode = root.querySelector('#hud-health i'); starsNode = root.querySelector('#hud-stars'); bannerNode = root.querySelector('#hud-banner'); centerNode = root.querySelector('#hud-center'); flashNode = root.querySelector('#hud-flash');
+    root.innerHTML = '<div id="cs-objective"></div><div id="cs-stats"><div id="cs-money"></div><div id="cs-stars"></div><div class="cs-health"><i id="cs-health-fill"></i></div></div><div id="cs-hint"></div><div id="cs-banner"></div><div id="cs-center"></div><div id="cs-flash"></div>';
+    bannerNode = document.getElementById('cs-banner'); centerNode = document.getElementById('cs-center'); flashNode = document.getElementById('cs-flash');
   }
-  function banner(text, ms) { if (bannerNode) { bannerNode.textContent = text || ''; bannerNode.style.display = text ? 'block' : 'none'; bannerUntil = performance.now() + (ms || 2600); } }
-  function showCenter(text, sub) { if (centerNode) { centerNode.innerHTML = '<strong>' + text + '</strong><small>' + (sub || '') + '</small>'; centerNode.style.display = 'flex'; centerUntil = performance.now() + 4000; } }
-  function damageFlash() { if (flashNode) { flashNode.style.opacity = '1'; flashUntil = performance.now() + 220; } }
+  function banner(text, ms) {
+    bannerNode.textContent = text || '';
+    if (!text) { bannerNode.style.display = 'none'; bannerUntil = 0; return; }
+    bannerNode.style.display = 'block'; bannerUntil = ms === Infinity ? Infinity : performance.now() + (ms || 2500);
+  }
+  function showCenter(text, sub) { centerNode.innerHTML = '<strong>' + text + '</strong><small>' + (sub || '') + '</small>'; centerNode.style.display = 'flex'; centerUntil = Infinity; }
+  function damageFlash() { flashNode.style.opacity = '1'; setTimeout(() => { flashNode.style.opacity = '0'; }, 180); }
   function update() {
     if (!root) return;
-    const state = CS.state || {}, health = CS.combat ? CS.combat.health : 100, stars = CS.police ? CS.police.getStars() : 0;
-    moneyNode.textContent = '$' + (state.money || 0).toLocaleString('en-US'); healthNode.style.width = Math.max(0, health) + '%';
-    starsNode.innerHTML = Array.from({ length: 5 }, (_, i) => '<span style="color:' + (i < stars ? '#ffd34e' : '#665a4d') + '">★</span>').join(' ');
-    objectiveNode.textContent = CS.missions ? CS.missions.currentObjective() : 'Free roam';
-    const hintNode = root.querySelector('#hud-hint');
-    if (hintNode) hintNode.innerHTML = CS.player?.state?.inCar ? 'E — exit car&nbsp;&nbsp; Space — handbrake' : 'E — enter car&nbsp;&nbsp; F — punch&nbsp;&nbsp; M — mute';
-    const remaining = CS.missions && CS.missions.timeRemaining(); timerNode.textContent = CS.shots?.mode() === 'mission' ? '1:27' : remaining == null ? '' : Math.floor(remaining / 60) + ':' + String(Math.floor(remaining % 60)).padStart(2, '0');
-    const now = performance.now(); if (now > bannerUntil) { bannerNode.textContent = ''; bannerNode.style.display = 'none'; } if (now > centerUntil) centerNode.style.display = 'none'; flashNode.style.opacity = now < flashUntil ? String((flashUntil - now) / 220) : '0';
+    const stars = CS.police ? CS.police.getStars() : 0;
+    document.getElementById('cs-money').textContent = '$' + (CS.state.money || 0).toLocaleString('en-US');
+    document.getElementById('cs-stars').innerHTML = Array.from({ length: 5 }, (_, i) => '<span class="' + (i < stars ? 'lit' : '') + '">★</span>').join('');
+    document.getElementById('cs-health-fill').style.width = Math.max(0, CS.combat ? CS.combat.health : 100) + '%';
+    const objective = CS.missions && CS.missions.currentObjective();
+    document.getElementById('cs-objective').textContent = objective || 'Free roam';
+    const player = CS.player.state;
+    document.getElementById('cs-hint').textContent = player.inCar ? 'E — exit car · Space — handbrake' : 'E — enter car  ·  F — punch  ·  M — mute';
+    if (performance.now() > bannerUntil) bannerNode.style.display = 'none';
   }
   CS.hud = { init, update, banner, showCenter, damageFlash };
-})();
+}());

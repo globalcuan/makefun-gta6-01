@@ -1,36 +1,40 @@
 (function () {
-  const CS = window.CS;
-  const missions = [
-    { title: 'First Wheels', briefing: ['Find a ride.', 'Drive to the yellow marker.'], reward: 300, target: [240, -120], objective: 'Drive to the marker' },
-    { title: 'Sunset Courier', briefing: ['Package secured.', 'Drop the package at the north docks'], reward: 500, target: [-360, 240], objective: 'Deliver the package', timer: 120 },
-    { title: 'Harbor Heat', briefing: ['Make some noise, then lose the heat.', 'Reach the harbor marker.'], reward: 800, target: [0, 480], objective: 'Lose the cops and reach the harbor' },
-    { title: 'The Big Score', briefing: ['Get inside the bank.', 'Wait for the vault.', 'Escape to the beach.'], reward: 2000, target: [-120, -360], objective: 'Reach the bank' }
+  const plans = [
+    { title: 'First Wheels', lines: ['Find a car and take it.', 'Drive to the marker at the south avenue.'], reward: 300, marker: { x: 240, z: -120 }, type: 'drive' },
+    { title: 'Sunset Courier', lines: ['A package needs to reach the north docks.', 'Drop the package at the north docks'], reward: 500, marker: { x: -360, z: 240 }, type: 'timed', limit: 120 },
+    { title: 'Harbor Heat', lines: ['Make some noise, then shake the police.', 'Reach the harbor once the heat is gone.'], reward: 800, marker: { x: 0, z: 480 }, type: 'heat' },
+    { title: 'The Big Score', lines: ['Get inside the bank and wait for the crew.', 'Escape to the beach with a three star wanted level.'], reward: 2000, marker: { x: -120, z: -360 }, escape: { x: 120, z: 480 }, type: 'bank' }
   ];
-  let index = 0, step = 0, elapsed = 0, beacon = null, disc = null, label = null;
-  function markerPos() { const m = missions[index]; if (!m || (index === 3 && step < 2)) return null; const p = index === 3 && step === 2 ? [120, 480] : m.target; return { x: p[0], z: p[1] }; }
-  function currentObjective() { const m = missions[index]; return m ? m.title + ' — ' + (index === 3 && step === 1 ? 'Wait inside' : index === 3 && step === 2 ? 'Escape to the beach' : m.objective) : 'Costa Serena complete'; }
-  function clearMarker() { if (beacon) { CS.city.scene.remove(beacon); CS.city.scene.remove(disc); CS.city.scene.remove(label); } beacon = disc = label = null; }
-  function makeMarker() {
-    clearMarker(); const pos = markerPos(); if (!pos) return;
-    disc = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, .12, 32), new THREE.MeshBasicMaterial({ color: 0xffd43b, transparent: true, opacity: .62 })); disc.position.set(pos.x, .08, pos.z); CS.city.scene.add(disc);
-    beacon = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 60, 16), new THREE.MeshBasicMaterial({ color: 0xff4ca8, emissive: 0xff1684, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false })); beacon.position.set(pos.x, 30, pos.z); CS.city.scene.add(beacon);
-    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const c = canvas.getContext('2d'); c.fillStyle = '#fff'; c.font = 'bold 30px system-ui'; c.textAlign = 'center'; c.fillText('OBJECTIVE', 128, 43); const tex = new THREE.CanvasTexture(canvas); label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true })); label.position.set(pos.x, 64, pos.z); label.scale.set(12, 3, 1); CS.city.scene.add(label);
+  let index = -1, phase = '', timer = 0, inside = 0, markerMesh = null, beacon = null, label = null;
+  function makeMarker(position) {
+    if (markerMesh) { markerMesh.parent.remove(markerMesh); beacon.parent.remove(beacon); label.parent.remove(label); }
+    const group = new THREE.Group(); group.position.set(position.x, 0, position.z);
+    markerMesh = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({ color: 0xffd52e, transparent: true, opacity: 0.65, side: THREE.DoubleSide })); markerMesh.rotation.x = -Math.PI / 2; group.add(markerMesh); CS.main.scene().add(group);
+    beacon = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 60, 12), new THREE.MeshBasicMaterial({ color: 0xff38c8, emissive: 0xff24bc, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false })); beacon.position.set(position.x, 30, position.z); CS.main.scene().add(beacon);
+    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const ctx = canvas.getContext('2d'); ctx.font = 'bold 30px system-ui'; ctx.fillStyle = '#fff3b0'; ctx.textAlign = 'center'; ctx.fillText('OBJECTIVE', 128, 42);
+    const texture = new THREE.CanvasTexture(canvas); label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true })); label.position.set(position.x, 64, position.z); label.scale.set(12, 3, 1); CS.main.scene().add(label);
   }
-  function startMission(i) { index = Math.max(0, Math.min(missions.length - 1, i)); step = 0; elapsed = 0; const m = missions[index]; m.briefing.forEach((line, n) => setTimeout(() => CS.hud.banner(line, 2400), n * 1900)); makeMarker(); }
-  function finish() { const m = missions[index]; CS.state.money += m.reward; CS.audio.sting(); CS.save.save(); index++; step = 0; if (index >= missions.length) { CS.state.money += 5000; clearMarker(); CS.hud.showCenter('COSTA SERENA COMPLETE', '$5,000 bonus'); CS.audio.sting(); CS.save.save(); } else startMission(index); }
+  function startMission(i) { index = Math.max(0, Math.min(3, i)); phase = index === 3 ? 'bank' : 'go'; timer = plans[index].limit || 0; inside = 0; say(plans[index].lines); makeMarker(plans[index].marker); }
+  function say(lines) { if (CS.shots && CS.shots.active()) return; lines.forEach((line, i) => setTimeout(() => CS.hud.banner(line, 2600), i * 2700)); }
+  function complete() {
+    const plan = plans[index]; CS.state.money = (CS.state.money || 0) + plan.reward; CS.audio.sting(); CS.save.save(); index++;
+    if (index >= plans.length) { CS.state.money += 5000; CS.hud.banner('COSTA SERENA COMPLETE — $5,000 BONUS', 7000); phase = 'done'; removeMarker(); }
+    else { phase = 'ready'; CS.hud.banner(plan.title + ' complete — $' + plan.reward, 3000); }
+  }
+  function removeMarker() { if (markerMesh) { markerMesh.parent.remove(markerMesh); beacon.parent.remove(beacon); label.parent.remove(label); markerMesh = beacon = label = null; } }
   function update(dt) {
-    if (!missions[index]) return; elapsed += dt; if (index === 1 && elapsed >= 120) { elapsed = 0; CS.hud.banner('Package lost — try again'); }
-    if (index === 2 && step === 0 && CS.police.getStars() >= 2) step = 1;
-    if (index === 2 && step === 1 && CS.police.getStars() === 0) step = 2;
-    if (index === 3 && step === 1 && elapsed >= 10) { step = 2; CS.police.setWanted(3); makeMarker(); }
-    const p = markerPos(); if (!p) return; const player = CS.player.state.position;
-    if (Math.hypot(player.x - p.x, player.z - p.z) < 12) {
-      if (index === 0 && (!CS.player.state.inCar)) return;
-      if (index === 2 && step < 2) return;
-      if (index === 3 && step === 0) { step = 1; elapsed = 0; makeMarker(); return; }
-      if (index === 3 && step === 1) return;
-      finish();
-    }
+    if (phase === 'ready') { startMission(index); return; }
+    if (index < 0 || phase === 'done') return;
+    const plan = plans[index], p = CS.player.state.position; if (plan.type === 'timed' && phase === 'go') { timer -= dt; if (timer <= 0) { timer = 0; phase = 'failed'; CS.hud.banner('Courier missed the deadline', 3500); } }
+    if (phase === 'failed') return;
+    let d = Math.hypot(p.x - (phase === 'escape' ? plan.escape.x : plan.marker.x), p.z - (phase === 'escape' ? plan.escape.z : plan.marker.z));
+    if (plan.type === 'heat' && phase === 'go') { if (CS.police.getStars() >= 2) phase = 'lose'; return; }
+    if (phase === 'lose') { if (CS.police.getStars() === 0 && d < 12) complete(); return; }
+    if (plan.type === 'bank' && phase === 'bank' && d < 12) { phase = 'inside'; inside = 0; CS.hud.banner('Stay inside the bank for 10 seconds', 3000); }
+    if (phase === 'inside') { inside += dt; if (inside >= 10) { phase = 'escape'; CS.police.setStars(3); makeMarker(plan.escape); } return; }
+    if ((plan.type === 'drive' || plan.type === 'timed' || plan.type === 'bank' && phase === 'escape') && d < 12) complete();
   }
-  CS.missions = { startMission, update, currentObjective, markerPos, timeRemaining: () => index === 1 ? Math.max(0, 120 - elapsed) : null, index: () => index, completed: () => index };
-})();
+  function currentObjective() { if (index < 0) return 'Start the story'; if (phase === 'done') return 'Costa Serena complete'; const plan = plans[index]; const seconds = plan.type === 'timed' && phase === 'go' ? '  ' + Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0') : ''; return plan.title + ': ' + (phase === 'lose' ? 'lose the wanted level' : phase === 'inside' ? 'wait ' + Math.max(0, Math.ceil(10 - inside)) + 's' : phase === 'escape' ? 'escape to the beach' : 'reach the marker') + seconds; }
+  function markerPos() { if (index < 0 || phase === 'done') return null; return phase === 'escape' ? plans[index].escape : plans[index].marker; }
+  CS.missions = { startMission, update, currentObjective, markerPos, setTimer: value => { timer = value; }, index: () => Math.max(0, index), completed: () => Math.max(0, Math.min(4, index)), addHeat() { CS.police.addHeat(1); } };
+}());

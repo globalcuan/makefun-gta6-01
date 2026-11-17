@@ -1,22 +1,29 @@
 (function () {
-  let ctx = null, master = null, engineOsc, engineGain, sirenOsc, sirenGain, ambientNodes = [], muted = false;
+  let context = null, master = null, engineOsc, engineGain, sirenOsc, sirenGain, ambientGain, muted = false, sirenTimer = 0;
   function init() {
-    if (ctx) return;
+    if (context) { context.resume(); return; }
     try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = .22; master.connect(ctx.destination);
-      engineOsc = ctx.createOscillator(); engineOsc.type = 'sawtooth'; const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 420; engineGain = ctx.createGain(); engineGain.gain.value = 0; engineOsc.connect(filter); filter.connect(engineGain); engineGain.connect(master); engineOsc.start();
-      sirenOsc = ctx.createOscillator(); sirenGain = ctx.createGain(); sirenGain.gain.value = 0; sirenOsc.connect(sirenGain); sirenGain.connect(master); sirenOsc.start();
-      for (const f of [110, 165]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.detune.value = f === 110 ? -4 : 4; g.gain.value = .012; o.connect(g); g.connect(master); o.start(); ambientNodes.push(o, g); }
-      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = .08; lg.gain.value = .006; lfo.connect(lg); lg.connect(ambientNodes[1].gain); lfo.start(); ambientNodes.push(lfo, lg);
-    } catch (_) { ctx = null; }
+      context = new (window.AudioContext || window.webkitAudioContext)(); master = context.createGain(); master.gain.value = muted ? 0 : 0.22; master.connect(context.destination);
+      engineOsc = context.createOscillator(); engineOsc.type = 'sawtooth'; const filter = context.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 350; engineGain = context.createGain(); engineGain.gain.value = 0; engineOsc.connect(filter).connect(engineGain).connect(master); engineOsc.start();
+      sirenOsc = context.createOscillator(); sirenOsc.type = 'square'; sirenGain = context.createGain(); sirenGain.gain.value = 0; sirenOsc.connect(sirenGain).connect(master); sirenOsc.start();
+      ambientGain = context.createGain(); ambientGain.gain.value = 0.018; ambientGain.connect(master);
+      [110, 164.81].forEach((hz, i) => { const osc = context.createOscillator(); osc.type = 'sine'; osc.frequency.value = hz; osc.detune.value = i ? 7 : -6; osc.connect(ambientGain); osc.start(); });
+    } catch (_) { context = null; }
   }
-  function tone(freq, duration, type, endFreq, gain) { if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(), now = ctx.currentTime; o.type = type || 'sine'; o.frequency.setValueAtTime(freq, now); if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, now + duration); g.gain.setValueAtTime(gain || .16, now); g.gain.exponentialRampToValueAtTime(.001, now + duration); o.connect(g); g.connect(master); o.start(now); o.stop(now + duration); }
-  function engine(speed01) { if (ctx && engineOsc) { engineOsc.frequency.setTargetAtTime(60 + Math.max(0, Math.min(1, speed01)) * 120, ctx.currentTime, .08); engineGain.gain.setTargetAtTime(speed01 ? .025 : 0, ctx.currentTime, .12); } }
-  function siren(on) { if (ctx && sirenOsc) { sirenGain.gain.setTargetAtTime(on ? .045 : 0, ctx.currentTime, .08); if (on) sirenOsc.frequency.setValueAtTime(Math.floor(ctx.currentTime * 2.5) % 2 ? 660 : 880, ctx.currentTime); } }
-  function pickup() { tone(880, .12, 'sine', 1320, .16); }
-  function sting() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, .22, 'sine', null, .13), i * 100)); }
-  function punch() { if (!ctx) return; const buffer = ctx.createBuffer(1, ctx.sampleRate * .12, ctx.sampleRate), data = buffer.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length); const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = buffer; g.gain.value = .2; src.connect(g); g.connect(master); src.start(); tone(90, .12, 'sine', 45, .18); }
-  function ambient() { if (!ctx) window.addEventListener('pointerdown', init, { once: true }); }
-  function toggleMute() { muted = !muted; if (ctx) master.gain.setTargetAtTime(muted ? 0 : .22, ctx.currentTime, .05); return muted; }
-  window.CS.audio = { init, engine, siren, pickup, sting, punch, ambient, toggleMute };
-})();
+  function tone(freq, duration, type, endFreq) {
+    if (!context) return;
+    const osc = context.createOscillator(), gain = context.createGain(); osc.type = type || 'sine'; osc.frequency.setValueAtTime(freq, context.currentTime);
+    if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, context.currentTime + duration);
+    gain.gain.setValueAtTime(0.18, context.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration); osc.connect(gain).connect(master); osc.start(); osc.stop(context.currentTime + duration);
+  }
+  function engine(speed) { if (context && engineOsc) { engineOsc.frequency.setTargetAtTime(60 + Math.max(0, Math.min(1, speed)) * 120, context.currentTime, 0.12); engineGain.gain.setTargetAtTime(speed > 0 ? 0.08 : 0, context.currentTime, 0.15); } }
+  function siren(on) { if (context && sirenGain) sirenGain.gain.setTargetAtTime(on ? 0.08 : 0, context.currentTime, 0.08); }
+  function pickup() { tone(880, 0.22, 'sine', 1320); }
+  function sting() { [523, 659, 784, 1046].forEach((hz, i) => setTimeout(() => tone(hz, 0.38, 'triangle'), i * 130)); }
+  function punch() { if (!context) return; tone(90, 0.18, 'sine', 48); const size = Math.floor(context.sampleRate * 0.12), buffer = context.createBuffer(1, size, context.sampleRate), data = buffer.getChannelData(0); for (let i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / size); const source = context.createBufferSource(), gain = context.createGain(); source.buffer = buffer; gain.gain.value = 0.16; source.connect(gain).connect(master); source.start(); }
+  function ambient() { if (context && context.state === 'suspended') context.resume(); }
+  function toggleMute() { muted = !muted; if (context) master.gain.setTargetAtTime(muted ? 0 : 0.22, context.currentTime, 0.05); return muted; }
+  window.addEventListener('pointerdown', init, { once: true });
+  window.addEventListener('keydown', init, { once: true });
+  CS.audio = { init, engine, siren, pickup, sting, punch, ambient, toggleMute };
+}());

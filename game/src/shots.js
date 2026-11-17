@@ -1,29 +1,44 @@
 (function () {
-  const CS = window.CS; let mode = null, seed = 7;
+  let active = false, seed = 7, shot = '';
   function apply() {
-    const query = new URLSearchParams(location.search); mode = query.get('shot'); seed = Number(query.get('seed')) || 7; if (!mode) return;
-    const rng = CS.rng(seed); CS.shotRng = rng;
-    if (mode === 'cover') {
-      CS.player.state.position.set(0, 0, 60); CS.player.state.inCar = null; CS.player.state.yaw = 0; CS.player.state.pitch = -.05; CS.shotFreeze = true;
-      const car = CS.traffic.cars[0]; if (car) { car.position.set(-5, 0, 42); car.rotation.y = 0; }
-      const person = CS.pedestrians.people[0]; if (person) person.position.set(10, 0, 54);
-    }
-    if (mode === 'chase') {
-      const car = CS.vehicles.cars[0]; CS.player.state.inCar = car; car.position.set(0, 0, 40); CS.player.state.position.copy(car.position); car.userData.speed = 25; car.rotation.y = 0;
-      CS.police.setWanted(3); const officers = CS.police.cars();
-      officers[0]?.position.set(-8, 0, 28); officers[1]?.position.set(0, 0, -10);
-      CS.player.state.yaw = 0; CS.player.state.pitch = .05;
-    }
-    if (mode === 'mission') {
-      CS.missions.startMission(1); const marker = CS.missions.markerPos();
-      const car = CS.vehicles.cars[0]; if (car) { car.position.set(marker.x - 5, 0, marker.z + 10); car.rotation.y = 0; }
-      CS.player.state.position.set(marker.x, 0, marker.z + 8); CS.player.state.inCar = null; CS.player.state.yaw = 0; CS.player.state.pitch = .15;
-      setTimeout(() => CS.hud.banner('Drop the package at the north docks', 2147483647), 2100);
-    }
-    if (mode === 'city') { const car = CS.vehicles.cars[0]; car.position.set(0, 0, 420); CS.player.state.inCar = car; CS.player.state.position.copy(car.position); CS.city.shotCamera = true; }
-    const bannerText = { cover: 'Find a set of wheels.', chase: 'Lose the cops!', city: 'Welcome to Costa Serena.' }[mode];
-    if (bannerText) CS.hud.banner(bannerText, 2147483647);
-    CS.player.syncVisual();
+    const params = new URLSearchParams(location.search); shot = params.get('shot') || ''; seed = Number(params.get('seed')) || 7; active = !!shot; CS.shots = { apply, compose, active: () => active, name: () => shot, seed: () => seed };
+    if (active) { CS.random = CS.rng(seed); CS.state.shot = shot; }
   }
-  CS.shots = { apply, mode: () => mode, seed: () => seed };
-})();
+  function compose(scene, camera) {
+    const player = CS.player.state, cars = CS.vehicles.cars;
+    const setPlayer = (x, z, car) => { player.position.set(x, 0, z); CS.player.setPose(x, z, car || null); };
+    if (shot === 'cover') {
+      CS.missions.startMission(0); setPlayer(60, -30); CS.player.setView(Math.PI, 0.2);
+      CS.pedestrians.people.slice(0, 3).forEach((ped, i) => ped.position.set(49 + i * 11, 0, -40 - i * 6));
+      cars[0].position.set(67, 0, -45); cars[0].rotation.y = 0;
+      cars[1].position.set(53, 0, -55); cars[1].rotation.y = 0;
+      camera.position.set(60, 3.2, -22); camera.lookAt(60, 0, -80);
+      CS.hud.banner('Find a set of wheels.', Infinity);
+    }
+    if (shot === 'chase') {
+      const car = cars[0]; car.position.set(0, 0, 0); car.rotation.y = 0; car.userData.speed = 25; setPlayer(0, 0, car);
+      CS.police.setStars(2);
+      for (let i = 0; i < 2; i++) { const police = CS.vehicles.createCar('interceptor'); police.position.set(i ? 4.5 : -4.5, 0, 7 + i * 2); police.userData.speed = 18; scene.add(police); CS.police.cars().push(police); }
+      camera.position.set(0, 4, -12); camera.lookAt(0, 1.2, 10);
+      CS.hud.banner('Lose the cops!', Infinity);
+    }
+    if (shot === 'mission') {
+      CS.missions.startMission(1); CS.missions.setTimer(87);
+      const marker = CS.missions.markerPos();
+      const cameraPoint = new THREE.Vector3(-300, 20, 295), target = new THREE.Vector3(marker.x, 0, marker.z);
+      const ray = target.clone().sub(cameraPoint), playerPoint = cameraPoint.clone().addScaledVector(ray, 0.6);
+      playerPoint.y = 0;
+      setPlayer(playerPoint.x, playerPoint.z); CS.player.setView(Math.atan2(-(target.x - playerPoint.x), -(target.z - playerPoint.z)), 0.2);
+      const side = new THREE.Vector3(-ray.z, 0, ray.x).normalize().multiplyScalar(5);
+      const nearbyCar = cars[0]; nearbyCar.position.set(playerPoint.x + side.x, 0, playerPoint.z + side.z); nearbyCar.rotation.y = 0;
+      camera.position.copy(cameraPoint); camera.lookAt(marker.x, 1, marker.z);
+      CS.hud.banner('Drop the package at the north docks', Infinity);
+    }
+    if (shot === 'city') {
+      const car = cars[0]; car.position.set(0, 0, 500); car.rotation.y = Math.PI; setPlayer(0, 500, car);
+      camera.position.set(0, 89, 590); camera.lookAt(0, 0, 300);
+      CS.hud.banner('Welcome to Costa Serena.', Infinity);
+    }
+  }
+  CS.shots = { apply, compose, active: () => active, name: () => shot, seed: () => seed };
+}());
