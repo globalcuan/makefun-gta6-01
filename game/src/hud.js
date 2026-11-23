@@ -1,3 +1,4 @@
+// Builds the on-screen HUD for objectives, cash, wanted stars, and speed.
 (function () {
   let root, bannerNode, centerNode, flashNode, objectiveNode, objectiveText = '', bannerUntil = 0, centerUntil = 0;
   function init() {

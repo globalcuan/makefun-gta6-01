@@ -1,3 +1,4 @@
+// Adds beach, marina, and billboard details to the world.
 (function () {
   let scene, rand = () => CS.random();
   const standard = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .82 }, extra || {}));

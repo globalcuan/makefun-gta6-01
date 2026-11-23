@@ -1,3 +1,4 @@
+// Sets up staged screenshot scenes for the entry's contact sheet.
 (function () {
   let active = false, seed = 7, shot = '';
   function apply() {

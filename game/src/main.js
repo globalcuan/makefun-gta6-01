@@ -1,3 +1,4 @@
+// Bootstraps the game by building the world and starting the loop.
 (function () {
   let renderer, scene, camera, clock, running = false, paused = false, frames = 0, fpsTime = 0, saveElapsed = 0, lastCar = null;
   function safeUpdate(fn, dt, ...args) { try { if (fn) fn(dt, ...args); } catch (error) { console.error('Game update failed:', error); } }
