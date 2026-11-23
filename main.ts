@@ -12,7 +12,7 @@
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,38 +22,6 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 const GAME_TITLE = 'Costa Serena';
 const GAME_VERSION = '1.0.1';
-const measure = (dir: string) => {
-  let files = 0;
-  let bytes = 0;
-  const visit = (path: string) => {
-    for (const name of readdirSync(path)) {
-      const child = join(path, name);
-      const info = statSync(child);
-      if (info.isDirectory()) visit(child);
-      else if (info.isFile()) { files++; bytes += info.size; }
-    }
-  };
-  if (existsSync(dir)) visit(dir);
-  return { files, bytes };
-};
-const game = measure(join(here, 'game'));
-const screenshotsDir = join(here, 'screenshots');
-const screenshots = measure(screenshotsDir);
-console.log(`Preflight game/: ${game.files} files, ${game.bytes} bytes`);
-console.log(`Preflight screenshots/: ${screenshots.files} files, ${screenshots.bytes} bytes`);
-if (game.files > 993) throw new Error(`Packaging limit exceeded: game/ exceeds 993 files (${game.files})`);
-if (game.bytes > 48 * 1024 * 1024) throw new Error(`Packaging limit exceeded: game/ exceeds 48 MiB (${game.bytes} bytes)`);
-if (existsSync(screenshotsDir)) {
-  const checkScreenshots = (dir: string) => {
-    for (const name of readdirSync(dir)) {
-      const child = join(dir, name);
-      const info = statSync(child);
-      if (info.isDirectory()) checkScreenshots(child);
-      else if (info.isFile() && info.size > 256 * 1024) throw new Error(`Packaging limit exceeded: screenshot ${child} exceeds 256 KiB (${info.size} bytes)`);
-    }
-  };
-  checkScreenshots(screenshotsDir);
-}
 console.log(`Packaging ${GAME_TITLE} v${GAME_VERSION}`);
 
 mkdirSync(out, { recursive: true });
@@ -75,3 +43,32 @@ writeFileSync(
     game_path_max_bytes: 1000,
   }),
 );
+
+// Validate the source assets after the dossier is written. This preflight is read-only, so the
+// bytes copied to the output directory stay deterministic across runs.
+const collectFiles = (dir: string): string[] => {
+  const files: string[] = [];
+  if (!existsSync(dir)) return files;
+  for (const name of readdirSync(dir)) {
+    const child = join(dir, name);
+    const info = statSync(child);
+    if (info.isDirectory()) files.push(...collectFiles(child));
+    else if (info.isFile()) files.push(child);
+  }
+  return files;
+};
+const gameFiles = collectFiles(join(here, 'game'));
+const gameBytes = gameFiles.reduce((total, path) => total + statSync(path).size, 0);
+const screenshotsFiles = collectFiles(join(here, 'screenshots'));
+for (const path of screenshotsFiles) {
+  const info = statSync(path);
+  if (info.size > 256 * 1024) throw new Error(`Packaging limit exceeded: ${path} exceeds 256 KiB (${info.size} bytes)`);
+  const magic = readFileSync(path).subarray(0, 4);
+  const jpeg = magic.length >= 2 && magic[0] === 0xff && magic[1] === 0xd8;
+  const png = magic.length >= 4 && magic[0] === 0x89 && magic[1] === 0x50 && magic[2] === 0x4e && magic[3] === 0x47;
+  if (!jpeg && !png) throw new Error(`Packaging limit exceeded: ${path} has invalid image magic bytes`);
+}
+console.log(`Preflight game/: ${gameFiles.length} files, ${gameBytes} bytes`);
+console.log(`Preflight screenshots/: ${screenshotsFiles.length} files`);
+if (gameFiles.length > 993) throw new Error(`Packaging limit exceeded: ${gameFiles[993]} puts game/ over 993 entries`);
+if (gameBytes > 48 * 1024 * 1024) throw new Error(`Packaging limit exceeded: ${gameFiles.at(-1) ?? join(here, 'game')} puts game/ over 48 MiB (${gameBytes} bytes)`);

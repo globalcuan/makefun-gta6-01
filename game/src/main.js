@@ -7,7 +7,7 @@
     CS.state = { money: 250 }; CS.shots.apply(); scene = CS.city.build(); camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 2000);
     CS.player.create(scene); CS.player.setCamera(camera); CS.input.init(canvas);
     CS.hud.init(); CS.minimap.init(); CS.police.init(scene); CS.audio.init();
-    CS.vehicles.spawnParkedCars(scene, 30); CS.traffic.spawn(scene, 14); CS.pedestrians.spawn(scene, 24);
+    CS.vehicles.spawnParkedCars(scene, 42); CS.traffic.spawn(scene, 22); CS.pedestrians.spawn(scene, 34);
     CS.main = { init, start, loop, scene: () => scene, camera: () => camera };
     const overlay = document.getElementById('start-screen'), continueButton = document.getElementById('continue');
     document.getElementById('start-story').addEventListener('click', () => start('story')); document.getElementById('free-roam').addEventListener('click', () => start('free')); continueButton.addEventListener('click', () => start('continue'));

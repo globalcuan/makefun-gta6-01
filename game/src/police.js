@@ -3,8 +3,8 @@
   const units = [];
   function addHeat(amount) { if (heatCooldown > 0) return; wanted = Math.min(5, wanted + Math.max(1, Math.floor(amount || 1))); heatCooldown = 1.5; }
   function createUnit() {
-    const car = CS.vehicles.createCar('interceptor', 0x182d45); car.userData.police = true;
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.18, 0.35), new THREE.MeshStandardMaterial({ color: 0x246bff, emissive: 0x1644ff, emissiveIntensity: 2 })); bar.position.set(0, 2.02, 0); car.add(bar); car.userData.lightbar = bar; sceneRef.add(car); units.push(car); return car;
+    const car = CS.vehicles.createCar('interceptor', 0xeeeeea); car.userData.police = true;
+    for (const side of [-1, 1]) { const stripe = new THREE.Mesh(new THREE.BoxGeometry(.045, .24, 2.65), new THREE.MeshStandardMaterial({ color: 0x172b3e })); stripe.position.set(side * 1.02, .98, 0); car.add(stripe); } car.userData.lightbar = car.userData.lightbar || []; sceneRef.add(car); units.push(car); return car;
   }
   function decay(dt, speed, hidden) { heatCooldown = Math.max(0, heatCooldown - dt); if (speed < 2 || hidden) { decay.wait = (decay.wait || 0) + dt; if (decay.wait > (hidden ? 5 : 18)) { decay.rate = (decay.rate || 0) + dt; if (decay.rate >= 18) { wanted = Math.max(0, wanted - 1); decay.rate = 0; } } } else { decay.wait = 0; decay.rate = 0; } }
   function update(dt, playerPos, inCar, speed) {
@@ -14,8 +14,7 @@
     units.forEach((car, i) => {
       const dx = playerPos.x - car.position.x, dz = playerPos.z - car.position.z; car.rotation.y = Math.atan2(-dx, -dz);
       CS.vehicles.update(car, { throttle: Math.min(1, 0.55 + Math.hypot(dx, dz) / 80), steer: 0 }, dt);
-      car.userData.lightbar.material.color.setHex(Math.floor(blink * 5 + i) % 2 ? 0xff2638 : 0x246bff);
-      car.userData.lightbar.material.emissive.setHex(Math.floor(blink * 5 + i) % 2 ? 0xff1010 : 0x1644ff);
+      const flash = Math.floor(blink * 5 + i) % 2; car.userData.lightbar.forEach((lamp, n) => { const red = flash === (n % 2); lamp.material.color.setHex(red ? 0xff2638 : 0x246bff); lamp.material.emissive.setHex(red ? 0xff1010 : 0x1644ff); });
       if (!inCar && car.position.distanceTo(playerPos) < 2.5) bustedTime += dt; else if (!inCar) bustedTime = 0;
     });
     if (bustedTime >= 2) busted();

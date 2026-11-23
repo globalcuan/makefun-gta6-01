@@ -1,32 +1,11 @@
 (function () {
-  const people = [], vehicles = [];
-  function spawn(scene, count) {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4b7581 }), legMat = new THREE.MeshStandardMaterial({ color: 0x393c48 });
-    for (let i = 0; i < count; i++) {
-      const person = new THREE.Group(); person.position.set(-570 + CS.random() * 1140, 0, -570 + CS.random() * 1040);
-      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.4, 1.25, 7), bodyMat); torso.position.y = 1.2; person.add(torso);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshStandardMaterial({ color: 0xd49a72 })); head.position.y = 2.05; person.add(head);
-      const legs = [];
-      for (const x of [-0.18, 0.18]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.8, 0.18), legMat); leg.position.set(x, 0.4, 0); person.add(leg); legs.push(leg); }
-      person.userData = { legs, phase: CS.random() * 6, heading: CS.random() * Math.PI * 2, change: CS.random() * 4 };
-      scene.add(person); people.push(person);
-    }
+  const people=[],vehicles=[],shirts=[0xe5a64c,0x348c87,0xc45648,0xd7d1bb,0x556e9a,0x843f5b],skins=[0xf0bf91,0xc98c68,0x8e5f49,0xe0a77c];
+  function spawn(scene,count){for(let i=0;i<count;i++){const person=new THREE.Group();person.position.set(-570+CS.random()*1140,0,-570+CS.random()*1040);const shirt=new THREE.MeshStandardMaterial({color:shirts[i%shirts.length]}),pants=new THREE.MeshStandardMaterial({color:[0x333844,0x48505a,0x293b40][i%3]}),skin=new THREE.MeshStandardMaterial({color:skins[i%skins.length]}),hair=new THREE.MeshStandardMaterial({color:[0x292624,0x513d2d,0x7d5236][i%3]});
+      const torso=new THREE.Mesh(new THREE.CylinderGeometry(.31,.4,1.08,8),shirt);torso.position.y=1.23;person.add(torso);const head=new THREE.Mesh(new THREE.SphereGeometry(.27,10,8),skin);head.position.y=2.02;person.add(head);const cap=new THREE.Mesh(new THREE.SphereGeometry(.28,10,6,0,Math.PI*2,0,Math.PI/2),hair);cap.position.y=2.14;person.add(cap);const legs=[],arms=[];
+      for(const x of [-.17,.17]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.17,.78,.2),pants);leg.position.set(x,.4,0);person.add(leg);legs.push(leg);const arm=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.64,8),skin);arm.position.set(x*2.5,1.25,0);person.add(arm);arms.push(arm);}
+      person.userData={legs,arms,phase:CS.random()*6,heading:CS.random()*Math.PI*2,change:CS.random()*4};scene.add(person);people.push(person);}
     vehicles.push(...CS.vehicles.cars);
   }
-  function update(dt) {
-    vehicles.splice(0, vehicles.length, ...CS.vehicles.cars, ...(CS.traffic ? CS.traffic.cars : []));
-    people.forEach(person => {
-      const d = person.userData; d.change -= dt;
-      d.stun = Math.max(0, (d.stun || 0) - dt);
-      d.flee = Math.max(0, (d.flee || 0) - dt);
-      if (d.change <= 0) { d.heading += (CS.random() - 0.5) * 1.5; d.change = 1 + CS.random() * 4; }
-      for (const car of vehicles) if (person.position.distanceTo(car.position) < 7) { d.heading = Math.atan2(person.position.x - car.position.x, person.position.z - car.position.z); d.flee = Math.max(d.flee, 2); break; }
-      const pace = d.stun > 0 ? 0 : d.flee > 0 ? 3.2 : 1.3;
-      person.position.x += Math.sin(d.heading) * pace * dt; person.position.z += Math.cos(d.heading) * pace * dt;
-      person.position.x = THREE.MathUtils.clamp(person.position.x, -589, 589); person.position.z = THREE.MathUtils.clamp(person.position.z, -589, 589);
-      person.rotation.y = d.heading; d.phase += dt * 7;
-      d.legs.forEach((leg, i) => { leg.rotation.x = Math.sin(d.phase + i * Math.PI) * 0.55; });
-    });
-  }
-  CS.pedestrians = { spawn, update, get people() { return people; } };
+  function update(dt){vehicles.splice(0,vehicles.length,...CS.vehicles.cars,...(CS.traffic?CS.traffic.cars:[]));people.forEach(person=>{const d=person.userData;d.change-=dt;d.stun=Math.max(0,(d.stun||0)-dt);d.flee=Math.max(0,(d.flee||0)-dt);if(d.change<=0){d.heading+=(CS.random()-.5)*1.5;d.change=1+CS.random()*4;}for(const car of vehicles)if(person.position.distanceTo(car.position)<7){d.heading=Math.atan2(person.position.x-car.position.x,person.position.z-car.position.z);d.flee=Math.max(d.flee,2);break;}const pace=d.stun>0?0:d.flee>0?3.2:1.3;person.position.x+=Math.sin(d.heading)*pace*dt;person.position.z+=Math.cos(d.heading)*pace*dt;person.position.x=THREE.MathUtils.clamp(person.position.x,-589,589);person.position.z=THREE.MathUtils.clamp(person.position.z,-589,589);person.rotation.y=d.heading;d.phase+=dt*7;d.legs.forEach((leg,i)=>leg.rotation.x=Math.sin(d.phase+i*Math.PI)*.48);d.arms.forEach((arm,i)=>arm.rotation.x=-Math.sin(d.phase+i*Math.PI)*.3);person.position.y=Math.abs(Math.sin(d.phase*2))*.025;});}
+  CS.pedestrians={spawn,update,get people(){return people;}};
 }());
