@@ -8,6 +8,10 @@
     CS.city.roadGrid.forEach(road => { ctx.beginPath(); if (road.vertical) { ctx.moveTo(road.x * scale, -100); ctx.lineTo(road.x * scale, 1300 * scale); } else { ctx.moveTo(-700 * scale, road.z * scale); ctx.lineTo(700 * scale, road.z * scale); } ctx.stroke(); });
     CS.traffic.cars.forEach(car => dot(car.position, '#e9c948', scale)); CS.police.cars().forEach(car => dot(car.position, '#49a6ff', scale));
     const marker = CS.missions.markerPos(); if (marker) { ctx.fillStyle = '#ff42d2'; ctx.save(); ctx.translate(marker.x * scale, marker.z * scale); ctx.rotate(Math.PI / 4); ctx.fillRect(-4, -4, 8, 8); ctx.restore(); }
+    if (typeof CS.activities !== 'undefined') {
+      CS.activities.packagePositions().forEach(pos => dot(pos, '#ffd34d', scale));
+      const race = CS.activities.raceState(); if (race.active && race.position) dot(race.position, '#32e5ff', scale);
+    }
     ctx.restore(); ctx.save(); ctx.translate(90, 90); ctx.rotate(-CS.player.state.yaw); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(-5, 5); ctx.lineTo(5, 5); ctx.fill(); ctx.restore();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText('N', 86, 15);
   }

@@ -3,7 +3,7 @@
   function save() {
     try {
       const p = CS.player.state.position;
-      localStorage.setItem(key, JSON.stringify({ money: CS.state.money, missionIndex: CS.missions.index(), completed: CS.missions.completed(), health: CS.combat.health, pos: { x: p.x, z: p.z }, at: Date.now() }));
+      localStorage.setItem(key, JSON.stringify({ money: CS.state.money, hiddenPackages: CS.state.hiddenPackages || 0, missionIndex: CS.missions.index(), completed: CS.missions.completed(), health: CS.combat.health, pos: { x: p.x, z: p.z }, at: Date.now() }));
       return true;
     } catch (_) { return false; }
   }

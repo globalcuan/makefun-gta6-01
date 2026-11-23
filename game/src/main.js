@@ -8,7 +8,7 @@
     CS.player.create(scene); CS.player.setCamera(camera); CS.input.init(canvas);
     CS.hud.init(); CS.minimap.init(); CS.police.init(scene); CS.audio.init();
     CS.vehicles.spawnParkedCars(scene, 42); CS.traffic.spawn(scene, 22); CS.pedestrians.spawn(scene, 34);
-    CS.main = { init, start, loop, scene: () => scene, camera: () => camera };
+    CS.main = { init, start, loop, scene: () => scene, camera: () => camera }; CS.activities.init();
     const overlay = document.getElementById('start-screen'), continueButton = document.getElementById('continue');
     document.getElementById('start-story').addEventListener('click', () => start('story')); document.getElementById('free-roam').addEventListener('click', () => start('free')); continueButton.addEventListener('click', () => start('continue'));
     if (CS.save.hasSave()) continueButton.hidden = false;
@@ -34,11 +34,11 @@
       const inCar = CS.player.state.inCar; if (inCar && inCar !== lastCar) { CS.police.addHeat(1); CS.audio.pickup(); } lastCar = inCar;
       safeUpdate(CS.traffic.update, dt); safeUpdate(CS.pedestrians.update, dt);
       const ps = CS.player.state; safeUpdate(CS.police.update, dt, ps.position, ps.inCar, ps.inCar ? Math.abs(ps.inCar.userData.speed) : 0);
-      safeUpdate(CS.combat.update, dt); safeUpdate(CS.missions.update, dt); safeUpdate(CS.hud.update, dt); safeUpdate(CS.minimap.update, dt);
+      safeUpdate(CS.combat.update, dt); safeUpdate(CS.missions.update, dt); safeUpdate(CS.activities.update, dt); safeUpdate(CS.hud.update, dt); safeUpdate(CS.minimap.update, dt);
       safeUpdate(() => { CS.audio.engine(ps.inCar ? Math.abs(ps.inCar.userData.speed) / CS.config.car.topSpeed : 0); CS.audio.siren(CS.police.getStars() > 0); CS.audio.ambient(); }, dt);
       saveElapsed += dt; if (saveElapsed >= 15) { CS.save.save(); saveElapsed = 0; }
       scene.traverse(object => { if (object.userData && object.userData.animate) object.userData.animate(time / 1000); });
-    } else if (CS.shots.active()) { safeUpdate(CS.hud.update, dt); safeUpdate(CS.minimap.update, dt); }
+    } else if (CS.shots.active()) { safeUpdate(CS.activities.update, dt); safeUpdate(CS.hud.update, dt); safeUpdate(CS.minimap.update, dt); }
     renderer.render(scene, camera); frames++;
     if (time - fpsTime > 500) { const state = CS.player.state; document.getElementById('debug').textContent = `FPS ${Math.round(frames * 1000 / Math.max(1, time - fpsTime))} | X ${state.position.x.toFixed(1)} Z ${state.position.z.toFixed(1)}`; frames = 0; fpsTime = time; }
   }

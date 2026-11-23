@@ -21,7 +21,7 @@ import { buildDossier } from './vendor/makefun-game.ts';
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 const GAME_TITLE = 'Costa Serena';
-const GAME_VERSION = '1.0.2';
+const GAME_VERSION = '1.0.5';
 console.log(`Packaging ${GAME_TITLE} v${GAME_VERSION}`);
 
 mkdirSync(out, { recursive: true });
