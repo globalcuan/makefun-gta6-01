@@ -21,7 +21,7 @@
       policeCar(-9, 455, -Math.PI / 2); policeCar(-18, 450, -Math.PI / 2); policeCar(-27, 460, -Math.PI / 2);
       putTraffic([[0, 12, 455, Math.PI / 2], [1, 22, 455, Math.PI / 2], [2, 31, 455, Math.PI / 2]]);
       putPeople([[0, -7, 482, 1.1], [1, 4, 484, -.7], [2, 16, 481, 2.1], [3, 27, 485, -1.8], [4, -19, 480, .2], [5, 37, 482, 2.8], [6, -31, 484, -1]]);
-      camera.position.set(-16, 3.3, 438); camera.lookAt(7, 1.2, 488);
+      camera.position.set(-30, 13, 435); camera.lookAt(-5, 1, 548);
       CS.hud.banner('Find a set of wheels — the Serena story begins.', Infinity);
     }
     if (shot === 'chase') {
@@ -35,7 +35,7 @@
       CS.hud.banner('Lose the cops!', Infinity);
     }
     if (shot === 'mission') {
-      CS.missions.startMission(1); CS.missions.setTimer(87);
+      CS.missions.startMission(1); CS.missions.setTimer(87); CS.police.setStars(2);
       const marker = CS.missions.markerPos(), px = marker.x, pz = marker.z - 8;
       setPlayer(px, pz); CS.player.setView(-Math.PI / 2, .15);
       const car = cars[0]; placeCar(car, px + 3, pz, Math.PI / 2);
@@ -47,6 +47,7 @@
       CS.hud.banner('Drop the package at the north docks', Infinity);
     }
     if (shot === 'city') {
+      CS.police.setStars(1);
       const car = cars[0]; placeCar(car, 0, 455, -Math.PI / 2); setPlayer(0, 455, car);
       putTraffic([[0, 18, 455, Math.PI / 2], [1, -27, 455, -Math.PI / 2], [2, 34, 455, Math.PI / 2], [3, 0, 360, 0], [4, 120, 365, Math.PI], [5, -75, 455, Math.PI / 2], [6, 75, 455, -Math.PI / 2], [7, -35, 360, 0], [8, 155, 365, Math.PI]]);
       putPeople([[0, -12, 480, 1], [1, 6, 483, 2], [2, 24, 479, -.5], [3, 36, 484, 2.5], [4, -34, 482, 0], [5, 50, 481, 1.4], [6, -48, 478, .8], [7, 68, 484, 2.2], [8, 42, 468, -1], [9, -25, 468, 1.7]]);

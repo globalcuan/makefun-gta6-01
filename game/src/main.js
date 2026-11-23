@@ -4,7 +4,7 @@
   function init() {
     const canvas = document.getElementById('game-canvas'); renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(innerWidth, innerHeight);
-    CS.state = { money: 250 }; CS.shots.apply(); scene = CS.city.build(); camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 2000);
+    CS.state = { money: 250 }; CS.shots.apply(); scene = CS.city.build(); CS.landmarks.build(scene); camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 2000);
     CS.player.create(scene); CS.player.setCamera(camera); CS.input.init(canvas);
     CS.hud.init(); CS.minimap.init(); CS.police.init(scene); CS.audio.init();
     CS.vehicles.spawnParkedCars(scene, 42); CS.traffic.spawn(scene, 22); CS.pedestrians.spawn(scene, 34);
